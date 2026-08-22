@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "Furnace Controller",
+			"path": "Dev/ProdV1/Furnace Controller"
+		},
+		{
+			"name": "rotaryEncoder",
+			"path": "Dev/Tests/RotaryEncoder/rotaryEncoder"
+		}
+	],
+	"settings": {
+	}
+}

@@ -14,6 +14,12 @@ This repo contains the starting information and design notes for a programmable 
 - `docs/electronics-architecture.md` outlines a first-pass electronics and control architecture.
 - `docs/hmi-and-control-plan.md` defines the PC HMI, local HMI, ESP32 state model, command model, and first prototype path.
 - `docs/local-hmi-design.md` defines the furnace-mounted screen, rotary encoder, buttons, pages, and interaction rules.
+- `docs/firmware-rtos-architecture.md` defines the ESP32 FreeRTOS task split and firmware safety/control ownership.
+- `docs/freertos-practical-guide.md` explains RTOS concepts, mutexes, queues, tasks, and how to apply them to this firmware.
+- `docs/platformio-espidf-path-issue.md` documents the ESP-IDF project creation failure caused by whitespace in the full project path.
+- `bom/furnace_bom.sqlite` stores the modular starter BOM with supplier offers and prices where captured.
+- `bom/README.md` explains the BOM schema, views, and rebuild commands.
+- `docs/sqlite-bom-intro.md` introduces SQLite and shows how to query, edit, and export the BOM data.
 
 ## Current Direction
 

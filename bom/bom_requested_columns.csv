@@ -1,0 +1,28 @@
+number,subnumber,category,part,use,price,link
+1,1,Controller,"ESP32-WROOM-32E development board or carrier module","Autonomous controller for profile execution, PID, telemetry, and local HMI.",150,https://www.diyelectronics.co.za/store/wireless-wifi/4216-esp32-development-board-wifi-bluetooth-ultra-low-power-consumption.html
+1,1,Controller,"ESP32-WROOM-32E development board or carrier module","Autonomous controller for profile execution, PID, telemetry, and local HMI.",,https://www.robotics.org.za/ESP32-DEV
+1,2,"Local HMI","2.8 inch SPI TFT display, ILI9341, 320x240","Local non-touch display for runtime, setpoint, TC1/TC2, output, and faults.",,https://www.diyelectronics.co.za/store/displays/1387-28-inch-320240-tft-touchscreen-display.html
+1,2,"Local HMI","2.8 inch SPI TFT display, ILI9341, 320x240","Local non-touch display for runtime, setpoint, TC1/TC2, output, and faults.",287.5,https://www.robotics.org.za/TFT-32-SPI-ILI9341
+1,3,"Local HMI","Detented rotary encoder with push button","Local menu navigation and value editing.",15.65,https://www.communica.co.za/products/rotary-encoder
+1,3,"Local HMI","Detented rotary encoder with push button","Local menu navigation and value editing.",23,https://www.robotics.org.za/ROT-ENC-TH
+1,4,"Local HMI","Green 22 mm momentary NO Start pushbutton","Physical Start command.",,https://www.communica.co.za/products/pb300mg
+1,4,"Local HMI","Green 22 mm momentary NO Start pushbutton","Physical Start command.",448.16,https://za.rs-online.com/web/p/push-button-heads/6097566
+1,5,"Local HMI","Red 22 mm momentary NO Stop pushbutton","Physical controlled Stop command.",332.35,https://www.communica.co.za/products/avp22f-m3scr12
+1,6,"Local HMI","White 22 mm momentary NO Back/Cancel pushbutton","Back/cancel navigation.",129.38,https://www.communica.co.za/products/pb300mw
+2,1,Safety,"22 mm latching mushroom emergency stop, 2 NC contacts","Hardwired emergency stop in the heater-enable chain.",,https://www.communica.co.za/collections/electromechanical/pushbutton-switches
+2,1,Safety,"22 mm latching mushroom emergency stop, 2 NC contacts","Hardwired emergency stop in the heater-enable chain.",,https://za.rs-online.com/web/p/emergency-stop-push-buttons/3308637
+2,2,Safety,"Positive-opening roller lever limit switch","Door/lid interlock for heater shutdown and status feedback.",,https://www.communica.co.za/products/wlca2-2y-n
+2,2,Safety,"Positive-opening roller lever limit switch","Door/lid interlock for heater shutdown and status feedback.",,https://za.rs-online.com/web/c/automation-control-gear/sensors-transducers/limit-switches/
+2,3,Safety,"Independent over-temperature limit device","Independent over-temperature shutdown.",,
+3,1,"Heater Control","Zero-cross AC solid-state relay, 25 A class, DC input","Zero-cross SSR for heater coil time-proportional control.",,https://www.robotics.org.za/SSR-25DA
+3,1,"Heater Control","Zero-cross AC solid-state relay, 25 A class, DC input","Zero-cross SSR for heater coil time-proportional control.",,https://za.rs-online.com/web/p/solid-state-relays/1846730
+3,2,"Heater Control","25 A class contactor with 24 V DC coil","Contactor or hard heater-enable path upstream of SSR.",,https://za.rs-online.com/web/c/switches/contactors/contractors/
+4,1,"Temperature Sensing","MAX31856 thermocouple interface module","Thermocouple measurement channels TC1 and TC2.",,https://www.diyelectronics.co.za/store/sensors/3263-adafruit-universal-thermocouple-amplifier-max31856-breakout.html
+4,1,"Temperature Sensing","MAX31856 thermocouple interface module","Thermocouple measurement channels TC1 and TC2.",,https://www.mouser.co.za/c/semiconductors/sensor-ics/temperature-sensor-ics/?q=MAX31856
+4,2,"Temperature Sensing","High-temperature Type K thermocouple probe","High-temperature furnace thermocouples.",,https://za.rs-online.com/web/c/test-measurement/temperature-measurement/thermocouples/
+5,1,Power,"24 V DC DIN-rail power supply, 30 W class","24 V control supply.",,https://www.communica.co.za/
+5,1,Power,"24 V DC DIN-rail power supply, 30 W class","24 V control supply.",,https://za.rs-online.com/web/p/din-rail-power-supplies/1869564
+5,2,Power,"24 V to 5 V DC-DC buck converter","5 V rail for ESP32 dev board and display.",,https://www.robotics.org.za/DC-DC-STEP-DOWN
+6,1,Indicators,"22 mm panel indicator LED, green","Panel Run indicator.",,
+6,2,Indicators,"22 mm panel indicator LED, red","Panel Fault indicator.",,
+6,3,Indicators,"5 V panel buzzer","Optional audible alert.",,https://www.robotics.org.za/index.php?route=product/search&search=buzzer%205v
