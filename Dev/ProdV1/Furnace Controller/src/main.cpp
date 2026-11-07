@@ -30,6 +30,7 @@ void setup() {
 
     initializeStateStore();
     createTasks();
+    // Network
 }
 
 void loop() {

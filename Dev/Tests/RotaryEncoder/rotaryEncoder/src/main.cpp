@@ -79,7 +79,7 @@ void applyPwmLedOutput(bool enabled, int32_t brightnessPercent) {
         : 0;
 
     ledcWrite(PwmLedChannel, duty);
-}
+}  
 
 void toggleActivityLed() {
     digitalWrite(ActivityLedPin, !digitalRead(ActivityLedPin));
