@@ -7,8 +7,10 @@ namespace SsrDriver {
 void begin();
 void turnOn(uint32_t nowMs);
 void turnOff();
-bool service(uint32_t nowMs);
+void setDutyPercent(uint8_t percent);
+uint8_t dutyPercent();
+bool isEnabled();
+void service(uint32_t nowMs);
 bool isCommandedOn();
-uint32_t remainingOnMs(uint32_t nowMs);
 
 }

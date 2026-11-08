@@ -5,51 +5,70 @@
 namespace {
 
 bool commandedOn = false;
-uint32_t onStartedMs = 0;
+bool enabled = false;
+uint8_t requestedDutyPercent = 0;
+uint32_t windowStartedMs = 0;
+
+void writeOutput(bool nextOn) {
+    digitalWrite(TestConfig::SsrDrivePin, nextOn ? HIGH : LOW);
+    commandedOn = nextOn;
+}
 
 }
 
 namespace SsrDriver {
 
 void begin() {
+    static_assert(TestConfig::SsrWindowMs > 0, "SSR window must be nonzero");
     digitalWrite(TestConfig::SsrDrivePin, LOW);
     pinMode(TestConfig::SsrDrivePin, OUTPUT);
     turnOff();
+    requestedDutyPercent = 0;
 }
 
 void turnOn(uint32_t nowMs) {
-    if (!commandedOn) {
-        onStartedMs = nowMs;
-        commandedOn = true;
-        digitalWrite(TestConfig::SsrDrivePin, HIGH);
+    if (!enabled) {
+        windowStartedMs = nowMs;
+        enabled = true;
     }
+    service(nowMs);
 }
 
 void turnOff() {
-    digitalWrite(TestConfig::SsrDrivePin, LOW);
-    commandedOn = false;
+    enabled = false;
+    writeOutput(false);
 }
 
-bool service(uint32_t nowMs) {
-    if (commandedOn && nowMs - onStartedMs >= TestConfig::MaximumOnMs) {
-        turnOff();
-        return true;
+void setDutyPercent(uint8_t percent) {
+    requestedDutyPercent = percent > 100 ? 100 : percent;
+    if (requestedDutyPercent == 0) {
+        writeOutput(false);
+    }
+}
+
+uint8_t dutyPercent() {
+    return requestedDutyPercent;
+}
+
+bool isEnabled() {
+    return enabled;
+}
+
+void service(uint32_t nowMs) {
+    if (!enabled) {
+        writeOutput(false);
+        return;
     }
 
-    return false;
+    const uint32_t elapsedMs = nowMs - windowStartedMs;
+    const uint32_t phaseMs = elapsedMs % TestConfig::SsrWindowMs;
+    windowStartedMs = nowMs - phaseMs;
+    const uint32_t onTimeMs = TestConfig::SsrWindowMs * requestedDutyPercent / 100;
+    writeOutput(phaseMs < onTimeMs);
 }
 
 bool isCommandedOn() {
     return commandedOn;
-}
-
-uint32_t remainingOnMs(uint32_t nowMs) {
-    if (!commandedOn) {
-        return 0;
-    }
-
-    const uint32_t elapsedMs = nowMs - onStartedMs;
-    return elapsedMs >= TestConfig::MaximumOnMs ? 0 : TestConfig::MaximumOnMs - elapsedMs;
 }
 
 }

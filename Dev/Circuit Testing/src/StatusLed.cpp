@@ -5,7 +5,7 @@
 
 namespace {
 
-enum class Notice { None, Timeout, CommandError };
+enum class Notice { None, CommandError };
 
 Notice notice = Notice::None;
 uint32_t noticeStartedMs = 0;
@@ -20,6 +20,8 @@ void setColor(uint8_t red, uint8_t green, uint8_t blue) {
     }
 }
 
+// holla
+
 }
 
 namespace StatusLed {
@@ -27,11 +29,6 @@ namespace StatusLed {
 void begin() {
     notice = Notice::None;
     setColor(0, 0, 0);
-}
-
-void showTimeout(uint32_t nowMs) {
-    notice = Notice::Timeout;
-    noticeStartedMs = nowMs;
 }
 
 void showCommandError(uint32_t nowMs) {
@@ -43,7 +40,7 @@ void clearNotice() {
     notice = Notice::None;
 }
 
-void service(uint32_t nowMs, bool ssrCommandedOn) {
+void service(uint32_t nowMs, bool ssrCommandedOn, bool outputEnabled) {
     if (notice != Notice::None && nowMs - noticeStartedMs >= TestConfig::LedNoticeMs) {
         clearNotice();
     }
@@ -53,8 +50,8 @@ void service(uint32_t nowMs, bool ssrCommandedOn) {
         setColor(0, brightness, 0);
     } else if (notice == Notice::CommandError) {
         setColor(brightness, 0, 0);
-    } else if (notice == Notice::Timeout) {
-        setColor(brightness, brightness / 2, 0);
+    } else if (outputEnabled) {
+        setColor(0, brightness / 2, brightness);
     } else {
         const bool heartbeatOn = nowMs % TestConfig::HeartbeatPeriodMs < TestConfig::HeartbeatOnMs;
         setColor(0, 0, heartbeatOn ? brightness : 0);
