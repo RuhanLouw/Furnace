@@ -23,6 +23,7 @@ button{font:inherit;min-height:52px;border:1px solid transparent;border-radius:6
 .on{background:#18784c;color:white}.off{background:#fff;color:#a0292e;border-color:#a0292e}button:disabled,input:disabled{opacity:.45;cursor:not-allowed}
 button:focus-visible,input:focus-visible{outline:3px solid #69a8e0;outline-offset:4px}#message{min-height:44px;margin:16px 0 0;font-size:14px;color:#59655e}
 .error{color:#a0292e!important}.note{font-size:13px;color:#59655e}footer{margin-top:25px;display:flex;justify-content:space-between;gap:15px;font-size:12px;color:#59655e}
+.temperatures{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.temperature{font-size:32px}.sensor-detail{font-size:12px;color:#59655e;margin:8px 0 0;overflow-wrap:anywhere}h2{font-size:18px;margin:0 0 18px}
 @media(max-width:460px){main{padding:22px 16px}header{align-items:flex-start;flex-direction:column}.readings{gap:10px}dd{font-size:18px}h1{font-size:22px}}
 </style>
 </head>
@@ -33,6 +34,14 @@ button:focus-visible,input:focus-visible{outline:3px solid #69a8e0;outline-offse
 <dl><dt>Output</dt><dd id="enabled">--</dd></dl>
 <dl><dt>Applied duty</dt><dd id="applied">--</dd></dl>
 <dl><dt>SSR command</dt><dd id="ssr">--</dd></dl>
+</section>
+<section class="section">
+<h2>Thermocouples</h2>
+<div class="temperatures">
+<div><dl><dt>TC1</dt><dd id="tc1" class="temperature">--</dd></dl><p id="tc1-status" class="sensor-detail" role="status">Waiting for reading</p><p id="tc1-detail" class="sensor-detail">Cold junction --</p></div>
+<div><dl><dt>TC2</dt><dd id="tc2" class="temperature">--</dd></dl><p id="tc2-status" class="sensor-detail" role="status">Waiting for reading</p><p id="tc2-detail" class="sensor-detail">Cold junction --</p></div>
+</div>
+<p class="note">Monitoring only. Sensor faults do not stop the manual SSR output.</p>
 </section>
 <section class="section">
 <div class="duty-heading"><label for="duty">Duty cycle</label><output id="draft" for="duty">0%</output></div>
@@ -47,12 +56,14 @@ button:focus-visible,input:focus-visible{outline:3px solid #69a8e0;outline-offse
 </main>
 <script>
 const ui=Object.fromEntries(['dot','connection','enabled','applied','ssr','duty','draft','on','off','message','uptime'].map(id=>[id,document.getElementById(id)]));
+const sensors=[1,2].map(number=>({value:document.getElementById('tc'+number),status:document.getElementById('tc'+number+'-status'),detail:document.getElementById('tc'+number+'-detail')}));
+function renderTemperatures(channels=[]){sensors.forEach((sensor,index)=>{const reading=channels[index];const valid=reading?.valid&&Number.isFinite(reading.celsius);sensor.value.textContent=valid?reading.celsius.toFixed(2)+' °C':'--';sensor.value.classList.toggle('error',!valid);const faults=reading?.status==='Thermocouple fault'?[[1,'Open probe'],[2,'Short to GND'],[4,'Short to VCC']].filter(([mask])=>reading.faults&mask).map(([,text])=>text):[];sensor.status.textContent=faults.length?faults.join(' / '):(reading?.status||'No current reading');sensor.status.classList.toggle('error',!valid);sensor.detail.textContent=reading?'Cold junction '+(Number.isFinite(reading.cold_junction_c)?reading.cold_junction_c.toFixed(2)+' °C':'--')+' · Age '+(Number.isFinite(reading.age_ms)?reading.age_ms+' ms':'--'):'Cold junction --';});}
 let online=false,busy=false,editing=false,polling=false,lastState=null;
 function controls(){ui.on.disabled=!online||busy;ui.duty.disabled=!online||busy;ui.off.disabled=busy;}
 function message(text,error=false){ui.message.textContent=text;ui.message.classList.toggle('error',error);}
-function disconnected(){online=false;ui.dot.classList.remove('live');ui.connection.textContent='Disconnected';ui.enabled.textContent='Unknown';ui.applied.textContent='--';ui.ssr.textContent='Unknown';controls();}
+function disconnected(){online=false;ui.dot.classList.remove('live');ui.connection.textContent='Disconnected';ui.enabled.textContent='Unknown';ui.applied.textContent='--';ui.ssr.textContent='Unknown';renderTemperatures();controls();}
 async function request(path,options={}){const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),3000);try{const response=await fetch(path,{...options,signal:abort.signal,cache:'no-store'});if(!response.ok)throw new Error(response.status===401?'Authentication required':'Request failed ('+response.status+')');return await response.json();}finally{clearTimeout(timer);}}
-function render(state){lastState=state;online=true;ui.dot.classList.add('live');ui.connection.textContent='Connected';ui.enabled.textContent=state.enabled?'Enabled':'Disabled';ui.applied.textContent=state.duty+'%';ui.ssr.textContent=state.ssr_on?'ON':'OFF';ui.uptime.textContent='Uptime '+state.uptime_s+' s';if(!editing){ui.duty.value=state.duty;ui.draft.textContent=state.duty+'%';}controls();}
+function render(state){lastState=state;online=true;ui.dot.classList.add('live');ui.connection.textContent='Connected';ui.enabled.textContent=state.enabled?'Enabled':'Disabled';ui.applied.textContent=state.duty+'%';ui.ssr.textContent=state.ssr_on?'ON':'OFF';ui.uptime.textContent='Uptime '+state.uptime_s+' s';renderTemperatures(state.thermocouples);if(!editing){ui.duty.value=state.duty;ui.draft.textContent=state.duty+'%';}controls();}
 async function refresh(){if(polling||busy)return;polling=true;try{const state=await request('/api/status');if(!busy)render(state);}catch(error){if(!busy){disconnected();message('Connection lost. Output state is unknown; it may still be running.',true);}}finally{polling=false;}}
 async function command(path,value){if(busy)return;busy=true;editing=false;controls();message('Waiting for controller confirmation...');try{const queued=await request(path,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Furnace-Control':'1'},body:new URLSearchParams({value:String(value)})});let confirmed=false;for(let attempt=0;attempt<12;attempt++){const state=await request('/api/status');render(state);if(((state.last_command_id-queued.id)|0)>=0){confirmed=true;break;}await new Promise(resolve=>setTimeout(resolve,75));}if(!confirmed)throw new Error('Controller did not confirm the command');message(lastState.enabled?'Output enabled. No automatic timeout.':'Output disabled.');}catch(error){disconnected();message(error.message+'. Check controller state before continuing.',true);}finally{busy=false;controls();}}
 ui.duty.addEventListener('input',()=>{editing=true;ui.draft.textContent=ui.duty.value+'%';});

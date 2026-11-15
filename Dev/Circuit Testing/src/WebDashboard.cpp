@@ -5,6 +5,7 @@
 
 #include "DashboardPage.h"
 #include "TestController.h"
+#include "ThermocoupleInput.h"
 
 #if __has_include("NetworkSecrets.h")
 #include "NetworkSecrets.h"
@@ -42,13 +43,37 @@ void sendStatus() {
         return;
     }
     const TestController::Snapshot state = TestController::snapshot();
-    char json[320];
+    const ThermocoupleInput::Snapshot temperatures = ThermocoupleInput::snapshot();
+    char channels[ThermocoupleInput::ChannelCount][320];
+    for (uint8_t channel = 0; channel < ThermocoupleInput::ChannelCount; ++channel) {
+        const auto &reading = temperatures.channels[channel];
+        const bool valid = reading.status == Max31855::Status::Ok;
+        char celsius[24] = "null";
+        char coldJunction[24] = "null";
+        char age[16] = "null";
+        if (valid) {
+            snprintf(celsius, sizeof(celsius), "%.2f", reading.celsius);
+        }
+        if (valid || reading.status == Max31855::Status::ThermocoupleFault) {
+            snprintf(coldJunction, sizeof(coldJunction), "%.4f", reading.coldJunctionCelsius);
+        }
+        if (temperatures.sampled) {
+            snprintf(age, sizeof(age), "%lu", static_cast<unsigned long>(millis() - temperatures.sampledAtMs));
+        }
+        snprintf(channels[channel], sizeof(channels[channel]),
+                 "{\"valid\":%s,\"celsius\":%s,\"cold_junction_c\":%s,\"faults\":%u,"
+                 "\"status\":\"%s\",\"raw\":%lu,\"age_ms\":%s}",
+                 valid ? "true" : "false", celsius, coldJunction, static_cast<unsigned int>(reading.faults),
+                 Max31855::statusText(reading.status), static_cast<unsigned long>(reading.raw), age);
+    }
+    char json[1024];
     snprintf(json, sizeof(json),
-             "{\"enabled\":%s,\"ssr_on\":%s,\"duty\":%u,\"last_command_id\":%lu,\"uptime_s\":%lu}",
+             "{\"enabled\":%s,\"ssr_on\":%s,\"duty\":%u,\"last_command_id\":%lu,\"uptime_s\":%lu,"
+             "\"thermocouples\":[%s,%s]}",
              state.enabled ? "true" : "false", state.ssrOn ? "true" : "false",
              static_cast<unsigned int>(state.dutyPercent),
              static_cast<unsigned long>(state.lastCommandId),
-             static_cast<unsigned long>(millis() / 1000));
+             static_cast<unsigned long>(millis() / 1000), channels[0], channels[1]);
     server.send(200, "application/json", json);
 }
 

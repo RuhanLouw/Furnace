@@ -4,6 +4,7 @@
 
 #include "TestConfig.h"
 #include "TestController.h"
+#include "ThermocoupleInput.h"
 #include "WebDashboard.h"
 
 namespace {
@@ -15,7 +16,8 @@ bool ready = false;
 
 void printHelp() {
     Serial.println("Furnace SSR test: GPIO4, rotary GPIO5/6, button GPIO7");
-    Serial.println("Commands + Enter: on (or 1), off (or 0), status, wifi, help");
+    Serial.println("Commands + Enter: on (or 1), off (or 0), status, temps, wifi, help");
+    Serial.println("MAX31855: shared CLK=GPIO12, DO=GPIO13; TC1 CS=GPIO10, TC2 CS=GPIO11.");
     Serial.println("Serial telemetry is request-only: status + Enter.");
     Serial.println("Rotate or use web slider: duty 0-100%. Push or web buttons: enable/disable.");
     Serial.println("1-second switching window. Starts disabled at 0%. No timeout.");
@@ -28,6 +30,7 @@ void printStatus() {
                   state.ssrOn ? 1 : 0, state.enabled ? 1 : 0,
                   static_cast<unsigned int>(state.dutyPercent), state.buttonPressed ? 1 : 0,
                   static_cast<unsigned long>(state.buttonPressCount));
+    ThermocoupleInput::printStatus();
 }
 
 void handleCommand(const char *command) {
@@ -38,6 +41,9 @@ void handleCommand(const char *command) {
         type = TestController::CommandType::Enable;
     } else if (strcmp(command, "status") == 0) {
         printStatus();
+        return;
+    } else if (strcmp(command, "temps") == 0) {
+        ThermocoupleInput::printStatus();
         return;
     } else if (strcmp(command, "help") == 0) {
         printHelp();
@@ -100,6 +106,9 @@ void setup() {
         return;
     }
     printHelp();
+    if (!ThermocoupleInput::begin()) {
+        Serial.println("Thermocouple task failed; dashboard will show unavailable. Manual SSR control is unchanged.");
+    }
     WebDashboard::begin();
 }
 

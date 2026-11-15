@@ -1,6 +1,6 @@
 # Furnace SSR circuit bring-up
 
-This project tests the furnace's NPN-driven SSR input using the newly identified ESP32-S3-WROOM-1 N16R8 development board: 16 MB flash and 8 MB octal PSRAM. It is a separate hardware test beside `../ProdV1/Furnace Controller`; it does not implement temperature measurement, PID, profiles, or interlocks.
+This project tests the furnace's NPN-driven SSR input and monitors two MAX31855 thermocouple boards using the ESP32-S3-WROOM-1 N16R8 development board: 16 MB flash and 8 MB octal PSRAM. It is a separate hardware test beside `../ProdV1/Furnace Controller`; it does not implement PID, profiles, or safety interlocks. Temperature readings are monitoring only: a probe fault does not disable the manual SSR output.
 
 The older controller targets ESP32-WROOM-32E and assigns GPIO26 to its SSR. Do not reuse that assignment on the S3: its memory wiring and available pins differ. This test assumes **GPIO4** drives the transistor. Match your wiring to this pin or change `SsrDrivePin` in `include/TestConfig.h` before uploading.
 
@@ -24,7 +24,7 @@ For the port labelled USB/OTG, select `ssr_native_usb` instead. That build enabl
 
 ### Web dashboard quick start
 
-The web page is stored on the ESP itself. It provides enable/OFF buttons, a 0-100% duty slider, confirmed controller state, and connection status. There are no external web assets or cloud services.
+The web page is stored on the ESP itself. It provides enable/OFF buttons, a 0-100% duty slider, confirmed controller state, connection status, and TC1/TC2 temperatures in degrees Celsius. Each sensor also shows its cold-junction temperature, sample age, and fault status. There are no external web assets or cloud services.
 
 1. Upload `ssr_uart` or `ssr_native_usb` as above.
 2. Open serial at 115200 baud. Send `wifi` + Enter to display the connection information and password again.
@@ -51,7 +51,7 @@ Start with the SSR load/output wiring disconnected from the heater supply. This 
 4. Rotate the encoder to select 0-100% duty, in 5% steps. Clockwise/counterclockwise direction depends on A/B wiring.
 5. Press and release the encoder button to enable output. Press again to disable. Holding it does not repeatedly toggle. Serial `on` or `1` also enables the selected duty; it does not set duty to 100%.
 6. Send `off` or `0`: GPIO4 goes LOW on receipt of the complete command. The selected duty is retained for the next enable.
-7. Send `status` + Enter on the serial/debug port to view `ssr_command`, `output_enabled`, `duty_percent`, `button_pressed`, and `button_press_count` once. Serial telemetry is strictly request-only: there is no periodic stream and no streaming command. These are software values, not physical output feedback. The web dashboard's HTTP status polling is independent of serial output.
+7. Send `status` + Enter on the serial/debug port to view SSR/encoder state plus both temperature channels once. Send `temps` + Enter for just the sensor diagnostics: Celsius, cold-junction Celsius, valid flag, fault bits, raw 32-bit frame, and sample age. Invalid temperatures are omitted rather than reported as zero. Serial telemetry is strictly request-only: there is no periodic stream and no streaming command. SSR values are software commands, not physical output feedback. The web dashboard's HTTP status polling is independent of serial output.
 
 The PlatformIO monitor enables local echo and LF line endings. Type a command and press Enter; Backspace/Delete editing, uppercase commands, and surrounding whitespace are accepted. Firmware still waits for a newline to execute a command. Restart the serial monitor after changing its settings, and re-upload for the new quiet-default firmware. Close Teleplot or other terminals before opening the same COM port in PlatformIO.
 
@@ -74,6 +74,65 @@ This is slow time-proportional control, not high-frequency GPIO PWM. Each 1000 m
 Actual AC load conduction is affected by the SSR switching characteristics and AC waveform. The advertised D48100A listing does not confirm zero-cross switching. This bring-up program has no temperature regulation or thermal shutdown inputs.
 
 ## Hardware connections
+
+### Two MAX31855 thermocouple boards
+
+These assignments are now in `include/TestConfig.h`. Use the GPIO numbers printed on the ESP32 board, not the ordinal position in the header. The SSR remains on GPIO4, the encoder on GPIO5/6/7, and the RGB LED on GPIO48.
+
+| MAX31855 pin | TC1 board to ESP32-S3 | TC2 board to ESP32-S3 |
+|---|---|---|
+| Vin | 3V3 | 3V3 |
+| 3VO | Leave unconnected | Leave unconnected |
+| GND | GND | GND |
+| DO / SO | GPIO13, shared | GPIO13, shared |
+| CS | GPIO10 | GPIO11 |
+| CLK / SCK | GPIO12, shared | GPIO12, shared |
+| Thermocouple + / T+ terminal | Probe 1 positive lead | Probe 2 positive lead |
+| Thermocouple - / T- terminal | Probe 1 negative lead | Probe 2 negative lead |
+
+Leave GPIO14 unconnected and reserved for the SPI driver's unused MOSI signal. In the installed Arduino-ESP32 2.0.17 core, passing -1 as MOSI still attaches the default FSPI MOSI pin, GPIO11. That conflicts with TC2 CS. The firmware therefore explicitly routes unused MOSI to GPIO14; neither MAX31855 board needs a MOSI wire. A null SPI bus is also checked before starting the sensor task, rather than accepting failed transfers as zero readings.
+
+The listed Vin/3VO arrangement assumes the common Adafruit-style regulated breakout matching your labels. [Adafruit specifies 3.3-5 V input for that board](https://www.adafruit.com/product/269). Use 3.3 V here so the setup stays in the ESP32 voltage domain. `3VO` is the regulator output, not a GPIO or extra supply input: do not join the two boards' regulator outputs. If yours is a different clone, confirm its Vin rating and check that 3VO is close to 3.3 V (within the MAX31855's 3.0-3.6 V operating range) before proceeding. Do not connect 5 V to 3VO, DO, CS, or CLK.
+
+There is no MOSI/DIN connection: this chip only sends data. DO can be shared because the MAX31855 releases its output while CS is HIGH. The code selects only one board at a time. Optional 10 kOhm resistors from each CS to 3V3 hold the boards deselected while the ESP32 resets. Keep the SPI leads short and route them away from SSR/heater conductors. No INA219 board, shunt modification, bias divider, or ESP32 ADC input is used.
+
+Check that both converter chips are the K-type variant (MAX31855K) if your probes are K-type. This is fixed by the chip variant, not selectable in software. Follow probe documentation for polarity; wire colours differ between standards. Do not connect either thermocouple lead to GND or 3V3. The MAX31855 does not support a junction electrically grounded to the furnace/chassis. Use appropriately isolated probes and keep mains away from all low-voltage wiring. Neither the converter nor this wiring provides galvanic isolation.
+
+Each board performs its own cold-junction compensation. Keep the input terminals and converter at a similar, stable ambient temperature, away from the ESP32 regulator, hot furnace surfaces, and strong airflow. A board's displayed cold-junction value is its local converter temperature, not the furnace temperature or an independent safety sensor.
+
+#### First test with the heater disconnected
+
+1. Power everything off, wire both boards as above, and check for shorts. Attach each probe to its own board's + and - terminals.
+2. Power the control electronics with the heater supply disconnected. Verify the converter supply voltage, then upload the firmware.
+3. Open the existing web dashboard and look for TC1 and TC2. They should settle near room temperature; the first sample waits at least 250 ms after sensor initialization.
+4. Warm one probe tip gently. Only its channel should rise. A decreasing reading suggests reversed polarity. Do not warm the converter PCB for this test.
+5. Disconnect one probe: that channel should show `Open probe` and `--`, while the other channel keeps updating. Keep probe leads away from grounded objects. Do not intentionally short a probe to a supply rail as a test.
+6. Send `temps` + Enter to inspect raw frames and faults without continuous serial output. Reconnect the probe and check that its valid reading returns automatically.
+7. Compare against a known thermometer before using measurements in later control work. The 0.25 degree output step is resolution, not total accuracy; probe tolerance, cold-junction gradients, thermocouple nonlinearity, and the converter's specified temperature range matter.
+
+#### Diagnosing zero readings
+
+Keep the heater supply disconnected. An all-zero frame means both the reported probe and cold-junction temperatures are zero with no fault flags; at room temperature, repeated zero frames are suspicious and do not establish that a probe is working.
+
+1. Use corrected firmware with unused MOSI on GPIO14. The original -1 setting allowed the core to take over GPIO11 (TC2 CS), a confirmed software pin conflict; fixing it does not prove the hardware is correct.
+2. Send `temps` + Enter. The raw frame distinguishes an actual decoded zero from a web-page issue. Check cold-junction temperature too: it should be close to the converter board's ambient temperature even when the probe is disconnected.
+3. With a DC voltmeter, measure each module's Vin and 3VO against that same module's GND. For this wiring Vin should be about 3.3 V and 3VO must be within the chip's 3.0-3.6 V operating range. If 3VO is too low, stop and identify the regulator/board before changing power connections.
+4. Power off before rewiring. Test board 1 alone, removing all connections to board 2, including its DO connection. Retain shared pin assignments CLK12/DO13 and CS10. Never leave an unpowered board attached to the shared data bus for this isolation test.
+5. Power up and disconnect only the thermocouple from board 1's terminals. After a fresh conversion it should report an open-probe fault. If raw data is still all zero, concentrate on power, CS/CLK/DO wiring, and the SPI path rather than temperature conversion or probe polarity.
+6. Repeat board 2 by itself, using CS11. If each works alone but not together, check the separate CS wires, DO sharing, solder bridges, and both boards' supply voltages.
+7. If available, use a logic analyser: CS10 or CS11 should go LOW for one 32-clock burst, CLK12 runs at 1 MHz, and DO13 supplies data. Compare signals at the ESP32 header and converter pins. A meter averages the short clock bursts and cannot validate SPI timing.
+
+No clock at the converter points to the firmware clock route or CLK wiring; clock at the converter but none at its DO points to selection, power, or the converter; data at the module but not the ESP32 points to DO wiring. These are diagnostic clues, not conclusive fault identification without observing the signals.
+
+#### Implementation details
+
+`ThermocoupleInput.cpp` uses the Arduino core's built-in SPI driver at 1 MHz, mode 0. No additional PlatformIO library is needed. A dedicated low-priority FreeRTOS task reads both converters every 250 ms, separate from the existing 1 ms SSR/encoder task. Serial and HTTP read a mutex-protected snapshot; they do not initiate competing SPI transactions.
+
+`Max31855Frame.h` decodes signed thermocouple bits 31:18 at 0.25 degrees/count and signed cold-junction bits 15:4 at 0.0625 degrees/count. The thermocouple field already includes the chip's cold-junction compensation; software must not add the cold-junction temperature a second time. Fault bits 0/1/2 indicate open probe, short to GND, and short to VCC. Reserved-bit or fault-summary inconsistencies are flagged as invalid SPI frames.
+
+`GET /api/status` retains the existing controller fields and adds a `thermocouples` array ordered TC1, TC2. Each object includes `valid`, `celsius`, `cold_junction_c`, `faults`, `status`, `raw`, and `age_ms`. Temperatures are JSON `null` when invalid; no NaN or fabricated zero is sent. Readings older than 1500 ms are marked stale, and browser disconnection clears the displayed temperatures. The page polls every 500 ms.
+
+The DO input has an internal pullup so a completely disconnected bus normally produces an invalid all-ones frame. The MAX31855 has no device-ID or CRC check: some wiring faults, such as DO stuck LOW, can still mimic a valid zero-valued frame. Fault checking is not proof of correct installation. This remains a manual bench controller, not a safe unattended furnace controller; sensor faults and high temperature do not automatically stop the SSR.
 
 ### Onboard LED
 
@@ -160,6 +219,10 @@ For an output test, use an enclosed, fused AC resistive test load and suitable i
 For the furnace, determine heater current from its supply voltage and power, then size the SSR heatsink and protection from verified thermal data. The printed 100 A rating alone is insufficient. The SSR can leak current when off and can fail conducting; retain the independent heater shutdown path. This bring-up firmware has no furnace safety inputs.
 
 ## Reference
+
+[MAX31855 datasheet](https://www.analog.com/media/en/technical-documentation/data-sheets/MAX31855.pdf): SPI framing, conversion timing, cold-junction compensation, and fault bits.
+
+[Adafruit MAX31855 guide](https://learn.adafruit.com/thermocouple/arduino-code): grounded-probe restriction and board bring-up.
 
 [Espressif ESP32-S3-WROOM-1 / WROOM-1U datasheet](https://www.espressif.com/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf): module memory variants and GPIO restrictions.
 
